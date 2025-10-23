@@ -1,0 +1,8 @@
+{
+  "SERVER_IP": "",
+  "SERVER_PORT": 5000,
+  "CAPTURE_INTERVAL": 1.0,
+  "MAX_WIDTH": 800,
+  "JPEG_QUALITY": 60,
+  "PASSWORD": "change_this_password"
+}

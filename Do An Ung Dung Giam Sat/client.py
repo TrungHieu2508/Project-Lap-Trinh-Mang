@@ -22,14 +22,68 @@ if not os.path.exists(CONFIG_PATH):
 with open(CONFIG_PATH, "r") as f:
     CONFIG = json.load(f)
 
-SERVER_IP = CONFIG["SERVER_IP"]
+SERVER_IP = CONFIG.get("SERVER_IP", "")
 SERVER_PORT = CONFIG["SERVER_PORT"]
 CAPTURE_INTERVAL = CONFIG["CAPTURE_INTERVAL"]
 MAX_WIDTH = CONFIG["MAX_WIDTH"]
 JPEG_QUALITY = CONFIG["JPEG_QUALITY"]
 PASSWORD = CONFIG["PASSWORD"]
 
-# --- Encryption helpers (Giữ nguyên phần này của bạn) ---
+# ----------------------------------------------------------------
+# Hàm tự động tìm server trong mạng LAN
+# ----------------------------------------------------------------
+def auto_discover_server(port=SERVER_PORT, timeout=0.5):
+    """
+    Quét các IP trong mạng LAN (192.168.x.x) để tìm server có cổng đang mở.
+    Trả về IP đầu tiên tìm thấy.
+    """
+    import ipaddress
+    import concurrent.futures
+
+    try:
+        local_ip = socket.gethostbyname(socket.gethostname())
+        subnet = ".".join(local_ip.split(".")[:3]) + ".0/24"
+    except Exception:
+        subnet = "192.168.1.0/24"
+
+    print(f"🔍 Đang quét mạng LAN {subnet} để tìm server...")
+
+    def check_ip(ip):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            s.connect((str(ip), port))
+            s.close()
+            return str(ip)
+        except:
+            return None
+
+    found_ip = None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        futures = [executor.submit(check_ip, ip) for ip in ipaddress.IPv4Network(subnet)]
+        for f in concurrent.futures.as_completed(futures):
+            res = f.result()
+            if res:
+                found_ip = res
+                print(f"✅ Tìm thấy server tại {found_ip}:{port}")
+                break
+
+    return found_ip
+
+# Nếu IP trống, tự động quét LAN
+if not SERVER_IP:
+    SERVER_IP = auto_discover_server(SERVER_PORT)
+    if not SERVER_IP:
+        raise RuntimeError("❌ Không tìm thấy server trong mạng LAN!")
+    else:
+        CONFIG["SERVER_IP"] = SERVER_IP
+        with open(CONFIG_PATH, "w") as f:
+            json.dump(CONFIG, f, indent=2)
+        print(f"💾 Đã lưu IP server vào config.json: {SERVER_IP}")
+
+# ----------------------------------------------------------------
+# Encryption helpers
+# ----------------------------------------------------------------
 try:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
@@ -63,8 +117,10 @@ def encrypt_bytes(data: bytes, password: str) -> bytes:
             out[i] ^= key[i % len(key)]
         return b"XORv1" + bytes(out)
 
-# ---------------- Socket + Metadata ----------------
-sio = socketio.Client(reconnection=False)  # Tự reconnect mình làm thủ công
+# ----------------------------------------------------------------
+# SocketIO + Metadata setup
+# ----------------------------------------------------------------
+sio = socketio.Client(reconnection=False)
 frame_queue = queue.Queue(maxsize=5)
 stop_event = threading.Event()
 
@@ -75,31 +131,31 @@ METADATA = {
 }
 
 # ----------------------------------------------------------------
-# THÊM CƠ CHẾ RECONNECT TÙY CHỈNH
+# Cơ chế kết nối + reconnect thủ công
 # ----------------------------------------------------------------
 def connect_to_server():
     while True:
         try:
-            print(f"🔌 Connecting to server {SERVER_IP}:{SERVER_PORT} ...")
+            print(f"🔌 Đang kết nối tới server {SERVER_IP}:{SERVER_PORT} ...")
             sio.connect(f"http://{SERVER_IP}:{SERVER_PORT}", wait=True)
-            print("✅ Connected to server!")
+            print("✅ Đã kết nối thành công tới server!")
             return
         except Exception as e:
-            print(f"⚠️ Could not connect: {e} -> retry in 5s")
+            print(f"⚠️ Không thể kết nối: {e} -> thử lại sau 5s")
             time.sleep(5)
 
 @sio.event
 def connect():
-    print("-> socket connected, sending metadata.")
+    print("-> Socket connected, gửi metadata.")
     sio.emit("register", METADATA)
 
 @sio.event
 def disconnect():
-    print("-> socket disconnected! Reconnecting...")
+    print("-> Socket disconnected! Reconnecting...")
     connect_to_server()
 
 # ----------------------------------------------------------------
-# Capture + CPU Optimization (chỉ gửi khi ảnh thay đổi)
+# Capture ảnh màn hình và gửi qua SocketIO
 # ----------------------------------------------------------------
 last_hash = None
 
@@ -117,11 +173,10 @@ def capture_loop():
             screenshot.save(buffer, format="JPEG", quality=JPEG_QUALITY, optimize=True)
             img_bytes = buffer.getvalue()
 
-            # Only push to queue if different from last frame
             current_hash = hashlib.md5(img_bytes).hexdigest()
             if current_hash == last_hash:
                 time.sleep(CAPTURE_INTERVAL)
-                continue  # Skip sending identical frame
+                continue
 
             last_hash = current_hash
 
@@ -137,6 +192,9 @@ def capture_loop():
             print("Capture error:", e)
             time.sleep(1)
 
+# ----------------------------------------------------------------
+# Gửi frame đã mã hoá tới server
+# ----------------------------------------------------------------
 def sender_loop():
     while not stop_event.is_set():
         try:
@@ -158,6 +216,9 @@ def sender_loop():
         finally:
             frame_queue.task_done()
 
+# ----------------------------------------------------------------
+# Main run
+# ----------------------------------------------------------------
 if __name__ == "__main__":
     connect_to_server()
 

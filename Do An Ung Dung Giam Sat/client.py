@@ -12,222 +12,156 @@ import os
 import json
 import hashlib
 
-# ----------------------------------------------------------------
-# Load CONFIG từ file config.json
-# ----------------------------------------------------------------
-CONFIG_PATH = "config.json"
-if not os.path.exists(CONFIG_PATH):
-    raise FileNotFoundError("❌ Không tìm thấy config.json!")
-
-with open(CONFIG_PATH, "r") as f:
-    CONFIG = json.load(f)
-
-SERVER_IP = CONFIG.get("SERVER_IP", "")
-SERVER_PORT = CONFIG["SERVER_PORT"]
-CAPTURE_INTERVAL = CONFIG["CAPTURE_INTERVAL"]
-MAX_WIDTH = CONFIG["MAX_WIDTH"]
-JPEG_QUALITY = CONFIG["JPEG_QUALITY"]
-PASSWORD = CONFIG["PASSWORD"]
-
-# ----------------------------------------------------------------
-# Hàm tự động tìm server trong mạng LAN
-# ----------------------------------------------------------------
-def auto_discover_server(port=SERVER_PORT, timeout=0.5):
-    """
-    Quét các IP trong mạng LAN (192.168.x.x) để tìm server có cổng đang mở.
-    Trả về IP đầu tiên tìm thấy.
-    """
-    import ipaddress
-    import concurrent.futures
-
-    try:
-        local_ip = socket.gethostbyname(socket.gethostname())
-        subnet = ".".join(local_ip.split(".")[:3]) + ".0/24"
-    except Exception:
-        subnet = "192.168.1.0/24"
-
-    print(f"🔍 Đang quét mạng LAN {subnet} để tìm server...")
-
-    def check_ip(ip):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(timeout)
+class RemoteMonitorClient:
+    def __init__(self):
+        self.sio = socketio.Client(reconnection=True, reconnection_attempts=5, reconnection_delay=1000)
+        self.stop_event = threading.Event()
+        self.frame_queue = queue.Queue(maxsize=5)
+        self.is_connected = False
+        self.config = self.load_config()
+        
+        self.setup_socketio()
+        
+    def load_config(self):
+        """Tải cấu hình từ file"""
+        config_path = "client_config.json"
+        default_config = {
+            "SERVER_IP": "localhost",
+            "SERVER_PORT": 5000,
+            "CAPTURE_INTERVAL": 0.5,
+            "MAX_WIDTH": 1280,
+            "JPEG_QUALITY": 70,
+            "PASSWORD": "change_this_password"
+        }
+        
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                return json.load(f)
+        else:
+            with open(config_path, "w") as f:
+                json.dump(default_config, f, indent=2)
+            return default_config
+    
+    def setup_socketio(self):
+        """Thiết lập SocketIO client"""
+        
+        @self.sio.event
+        def connect():
+            self.is_connected = True
+            print("✅ Đã kết nối thành công tới server!")
+            
+            # Gửi metadata đăng ký
+            metadata = {
+                "username": getpass.getuser(),
+                "hostname": socket.gethostname(),
+                "pid": os.getpid()
+            }
+            self.sio.emit("register", metadata)
+            
+            # Bắt đầu gửi frame
+            self.start_capture()
+        
+        @self.sio.event
+        def disconnect():
+            self.is_connected = False
+            print("❌ Mất kết nối với server!")
+            self.stop_event.set()
+    
+    def connect_to_server(self):
+        """Kết nối đến server"""
         try:
-            s.connect((str(ip), port))
-            s.close()
-            return str(ip)
-        except:
-            return None
-
-    found_ip = None
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        futures = [executor.submit(check_ip, ip) for ip in ipaddress.IPv4Network(subnet)]
-        for f in concurrent.futures.as_completed(futures):
-            res = f.result()
-            if res:
-                found_ip = res
-                print(f"✅ Tìm thấy server tại {found_ip}:{port}")
-                break
-
-    return found_ip
-
-# Nếu IP trống, tự động quét LAN
-if not SERVER_IP:
-    SERVER_IP = auto_discover_server(SERVER_PORT)
-    if not SERVER_IP:
-        raise RuntimeError("❌ Không tìm thấy server trong mạng LAN!")
-    else:
-        CONFIG["SERVER_IP"] = SERVER_IP
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(CONFIG, f, indent=2)
-        print(f"💾 Đã lưu IP server vào config.json: {SERVER_IP}")
-
-# ----------------------------------------------------------------
-# Encryption helpers
-# ----------------------------------------------------------------
-try:
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.fernet import Fernet
-    CRYPTO_AVAILABLE = True
-except Exception:
-    CRYPTO_AVAILABLE = False
-
-def derive_fernet_key(password: str, salt: bytes) -> bytes:
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=390000,
-        backend=default_backend()
-    )
-    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
-
-def encrypt_bytes(data: bytes, password: str) -> bytes:
-    if CRYPTO_AVAILABLE:
-        salt = os.urandom(16)
-        key = derive_fernet_key(password, salt)
-        f = Fernet(key)
-        token = f.encrypt(data)
-        return salt + token
-    else:
+            server_url = f"http://{self.config['SERVER_IP']}:{self.config['SERVER_PORT']}"
+            print(f"🔌 Đang kết nối tới {server_url}...")
+            self.sio.connect(server_url, wait_timeout=10)
+        except Exception as e:
+            print(f"❌ Lỗi kết nối: {e}")
+            return False
+        return True
+    
+    def start_capture(self):
+        """Bắt đầu chụp và gửi màn hình"""
+        def capture_loop():
+            last_hash = None
+            while not self.stop_event.is_set() and self.is_connected:
+                try:
+                    # Chụp màn hình
+                    screenshot = pyautogui.screenshot()
+                    w, h = screenshot.size
+                    max_width = self.config["MAX_WIDTH"]
+                    
+                    # Resize nếu cần
+                    if w > max_width:
+                        new_h = int(h * (max_width / w))
+                        screenshot = screenshot.resize((max_width, new_h), Image.LANCZOS)
+                    
+                    # Nén ảnh
+                    buffer = io.BytesIO()
+                    screenshot.save(buffer, format="JPEG", quality=self.config["JPEG_QUALITY"], optimize=True)
+                    img_bytes = buffer.getvalue()
+                    
+                    # Kiểm tra frame trùng
+                    current_hash = hashlib.md5(img_bytes).hexdigest()
+                    if current_hash == last_hash:
+                        time.sleep(self.config["CAPTURE_INTERVAL"])
+                        continue
+                    
+                    last_hash = current_hash
+                    
+                    # Mã hóa và gửi
+                    encrypted = self.encrypt_bytes(img_bytes, self.config["PASSWORD"])
+                    payload = {
+                        "meta": {
+                            "username": getpass.getuser(),
+                            "hostname": socket.gethostname(),
+                            "pid": os.getpid()
+                        },
+                        "timestamp": int(time.time()),
+                        "enc_image_b64": base64.b64encode(encrypted).decode(),
+                        "enc_scheme": "xor_fallback"
+                    }
+                    
+                    if self.is_connected:
+                        self.sio.emit("image_encrypted", payload)
+                    
+                    time.sleep(self.config["CAPTURE_INTERVAL"])
+                    
+                except Exception as e:
+                    print(f"❌ Lỗi chụp màn hình: {e}")
+                    time.sleep(1)
+        
+        # Chạy trong thread riêng
+        capture_thread = threading.Thread(target=capture_loop, daemon=True)
+        capture_thread.start()
+    
+    def encrypt_bytes(self, data: bytes, password: str) -> bytes:
+        """Mã hóa dữ liệu"""
         key = hashlib.sha256(password.encode()).digest()
         out = bytearray(data)
         for i in range(len(out)):
             out[i] ^= key[i % len(key)]
         return b"XORv1" + bytes(out)
+    
+    def disconnect(self):
+        """Ngắt kết nối"""
+        self.stop_event.set()
+        self.sio.disconnect()
+        print("⏹️ Đã ngắt kết nối")
 
-# ----------------------------------------------------------------
-# SocketIO + Metadata setup
-# ----------------------------------------------------------------
-sio = socketio.Client(reconnection=False)
-frame_queue = queue.Queue(maxsize=5)
-stop_event = threading.Event()
-
-METADATA = {
-    "username": getpass.getuser(),
-    "hostname": socket.gethostname(),
-    "pid": os.getpid()
-}
-
-# ----------------------------------------------------------------
-# Cơ chế kết nối + reconnect thủ công
-# ----------------------------------------------------------------
-def connect_to_server():
-    while True:
+def main():
+    client = RemoteMonitorClient()
+    
+    # Kết nối đến server
+    if client.connect_to_server():
+        print("🚀 Client đã khởi động. Nhấn Ctrl+C để dừng.")
         try:
-            print(f"🔌 Đang kết nối tới server {SERVER_IP}:{SERVER_PORT} ...")
-            sio.connect(f"http://{SERVER_IP}:{SERVER_PORT}", wait=True)
-            print("✅ Đã kết nối thành công tới server!")
-            return
-        except Exception as e:
-            print(f"⚠️ Không thể kết nối: {e} -> thử lại sau 5s")
-            time.sleep(5)
+            # Giữ chương trình chạy
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n🛑 Đang dừng client...")
+            client.disconnect()
+    else:
+        print("❌ Không thể kết nối đến server. Kiểm tra cấu hình và thử lại.")
 
-@sio.event
-def connect():
-    print("-> Socket connected, gửi metadata.")
-    sio.emit("register", METADATA)
-
-@sio.event
-def disconnect():
-    print("-> Socket disconnected! Reconnecting...")
-    connect_to_server()
-
-# ----------------------------------------------------------------
-# Capture ảnh màn hình và gửi qua SocketIO
-# ----------------------------------------------------------------
-last_hash = None
-
-def capture_loop():
-    global last_hash
-    while not stop_event.is_set():
-        try:
-            screenshot = pyautogui.screenshot()
-            w, h = screenshot.size
-            if w > MAX_WIDTH:
-                new_h = int(h * (MAX_WIDTH / w))
-                screenshot = screenshot.resize((MAX_WIDTH, new_h), Image.LANCZOS)
-
-            buffer = io.BytesIO()
-            screenshot.save(buffer, format="JPEG", quality=JPEG_QUALITY, optimize=True)
-            img_bytes = buffer.getvalue()
-
-            current_hash = hashlib.md5(img_bytes).hexdigest()
-            if current_hash == last_hash:
-                time.sleep(CAPTURE_INTERVAL)
-                continue
-
-            last_hash = current_hash
-
-            try:
-                frame_queue.put_nowait(img_bytes)
-            except queue.Full:
-                _ = frame_queue.get_nowait()
-                frame_queue.put_nowait(img_bytes)
-
-            time.sleep(CAPTURE_INTERVAL)
-
-        except Exception as e:
-            print("Capture error:", e)
-            time.sleep(1)
-
-# ----------------------------------------------------------------
-# Gửi frame đã mã hoá tới server
-# ----------------------------------------------------------------
-def sender_loop():
-    while not stop_event.is_set():
-        try:
-            img_bytes = frame_queue.get(timeout=1)
-        except queue.Empty:
-            continue
-
-        try:
-            encrypted = encrypt_bytes(img_bytes, PASSWORD)
-            payload = {
-                "meta": METADATA,
-                "timestamp": int(time.time()),
-                "enc_image_b64": base64.b64encode(encrypted).decode(),
-                "enc_scheme": "fernet" if CRYPTO_AVAILABLE else "xor_fallback"
-            }
-            sio.emit("image_encrypted", payload)
-        except Exception as e:
-            print("Send error:", e)
-        finally:
-            frame_queue.task_done()
-
-# ----------------------------------------------------------------
-# Main run
-# ----------------------------------------------------------------
 if __name__ == "__main__":
-    connect_to_server()
-
-    threading.Thread(target=capture_loop, daemon=True).start()
-    threading.Thread(target=sender_loop, daemon=True).start()
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        stop_event.set()
-        sio.disconnect()
+    main()

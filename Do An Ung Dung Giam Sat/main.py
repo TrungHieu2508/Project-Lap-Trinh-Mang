@@ -1,3 +1,4 @@
+# main.py
 import tkinter as tk
 from tkinter import messagebox
 import subprocess
@@ -30,7 +31,7 @@ class AppLauncher:
         # Header
         header_frame = tk.Frame(self.root, bg="#2c3e50")
         header_frame.pack(fill="x")
-        tk.Label(header_frame, text="🎓 Ứng dụng Giám sát Phòng máy",
+        tk.Label(header_frame, text="Ứng dụng Giám sát Phòng máy",
                  font=("Arial", 16, "bold"), bg="#2c3e50", fg="white", pady=10).pack(side="left", padx=15)
 
         teacher_btn = tk.Button(header_frame, text="Đăng nhập Giáo viên",
@@ -60,7 +61,7 @@ class AppLauncher:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        tk.Label(self.root, text="🔐 Đăng nhập dành cho giáo viên",
+        tk.Label(self.root, text="Đăng nhập dành cho giáo viên",
                  font=("Arial", 14, "bold"), bg="#ecf0f1").pack(pady=20)
 
         tk.Label(self.root, text="Tên đăng nhập:", bg="#ecf0f1", font=("Arial", 11)).pack()
@@ -75,7 +76,7 @@ class AppLauncher:
                   bg="#2980b9", fg="white", width=15,
                   command=self.teacher_login).pack(pady=15)
 
-        tk.Button(self.root, text="← Quay lại", command=self.create_main_screen,
+        tk.Button(self.root, text="Quay lại", command=self.create_main_screen,
                   bg="#bdc3c7", fg="black").pack()
 
     def teacher_login(self):
@@ -99,22 +100,11 @@ class AppLauncher:
     def connect_as_student(self):
         code = self.code_entry.get().strip().upper()
         if not code:
-            self.status_label.config(text="⚠️ Vui lòng nhập mã lớp trước.")
+            self.status_label.config(text="Vui lòng nhập mã lớp trước.")
             return
 
-        # Kiểm tra session có tồn tại không
-        if not os.path.exists(SESSION_FILE):
-            self.status_label.config(text="❌ Hiện chưa có lớp học nào đang mở.")
-            return
-
-        with open(SESSION_FILE, "r") as f:
-            data = json.load(f)
-        if code != data.get("session_id"):
-            self.status_label.config(text="❌ Mã code không hợp lệ.")
-            return
-
-        messagebox.showinfo("Thành công", "Đang kết nối đến máy giáo viên...")
-        self.launch_client()
+        messagebox.showinfo("Thành công", "Đang tìm và kết nối đến máy giáo viên...")
+        self.launch_client(code)
 
     # ========== MỞ FILE SERVER / CLIENT ==========
     def launch_server(self):
@@ -124,9 +114,9 @@ class AppLauncher:
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể mở server.py\n{e}")
 
-    def launch_client(self):
+    def launch_client(self, session_id):
         try:
-            subprocess.Popen([sys.executable, "client.py"])
+            subprocess.Popen([sys.executable, "client.py", session_id])
             self.root.destroy()
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể mở client.py\n{e}")

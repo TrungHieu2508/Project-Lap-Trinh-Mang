@@ -1,0 +1,6 @@
+flask
+flask-socketio
+eventlet
+pillow
+cryptography
+tk

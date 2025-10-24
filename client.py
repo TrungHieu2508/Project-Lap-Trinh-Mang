@@ -216,6 +216,23 @@ def sender_loop():
         finally:
             frame_queue.task_done()
 
+@sio.on("stop_client")
+def on_stop_client(data):
+    cid = f"{USERNAME}@{HOSTNAME}"
+    if data.get("client_id") == cid:
+        print("🛑 Server yêu cầu ngắt kết nối — dừng gửi ảnh.")
+        sio.disconnect()
+
+@sio.event
+def disconnect():
+    print("❌ Đã ngắt kết nối khỏi server.")
+    
+@sio.on("stop_all_clients")
+def stop_all(data):
+    print("🛑 Server yêu cầu dừng toàn bộ giám sát.")
+    sio.disconnect()
+
+
 # ----------------------------------------------------------------
 # Main run
 # ----------------------------------------------------------------

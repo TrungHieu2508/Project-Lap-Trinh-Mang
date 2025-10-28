@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login web</title>
+    <link rel="stylesheet" href="Login.css">
+    <link rel="icon" href="/Project-Lap-Trinh-Mang/imgs/LOGO.jpg" type="image/x-icon">
+</head>
+<body>
+  <div class="snow"></div> <!-- Snow -->
+    <div class="wrapper">
+        <form action="your-login-page.html" method="POST" class="form">
+            <h1 class="title">ADMIN</h1>
+            <div class="inp" id="adminInputs">
+                <input type="text" name="username" id="username" class="input" placeholder="Name" required>
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="inp" id="studentInputs" style="display: none;">
+                <input type="text" name="studentCode" id="studentCode" class="input" placeholder="Student Code" required>
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="inp" id="passwordField">
+                <input type="password" name="password" id="password" class="input" placeholder="Password" required>
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <button type="submit" class="submit">Log in</button>
+            <p class="footer">Information <a href="#" class="link">Home page</a></p>   
+
+            <div class="bottom-buttons">
+                <button type="button" class="toggle-btn" id="toggleToStudent" onclick="togglePage('student')">User</button>
+                <button type="button" class="toggle-btn" id="toggleToAdmin" onclick="togglePage('admin')">Admin</button>
+            </div>
+        </form>
+        <div></div>
+        <div class="banner">
+            <h1 class="wel_text" id="bannerName">Admin</h1>
+            <img src="/Project-Lap-Trinh-Mang/imgs/LOGO.jpg" alt="Admin Image" class="admin-image" id="bannerImage">
+        </div>
+    </div>
+    
+    <script src="Login.js"></script>  
+</body>
+</html>
+
+
+
+           

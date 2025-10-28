@@ -1,0 +1,248 @@
+/* Global styles */
+* {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    color: #fff;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    background: #081b29;
+    display: grid;
+    justify-content: center;
+    align-content: center;
+    transition: background 0.5s ease;
+}
+
+::-webkit-input-placeholder {
+    color: #eee;
+}
+
+.wrapper {
+    position: relative;
+    width: 800px;
+    height: 65vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 3px solid #00ffff;
+    box-shadow: 0 0 50px 0 #00a6bc;
+    transition: all 0.5s ease;
+    border-radius: 30px;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.title {
+    font-size: 35px;
+    transition: transform 0.5s ease;
+}
+
+.inp {
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.input {
+    border: none;
+    outline: none;
+    background: none;
+    width: 260px;
+    margin-top: 40px;
+    padding-right: 10px;
+    font-size: 17px;
+    color: #0ef;
+}
+
+.submit {
+    border: none;
+    outline: none;
+    width: 288px;
+    margin-top: 25px;
+    padding: 10px 0;
+    font-size: 20px;
+    border-radius: 40px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    background: linear-gradient(45deg, #0ef, #c800ff);
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.submit:hover {
+    transform: scale(1.05);
+    background: linear-gradient(45deg, #c800ff, #0ef);
+}
+
+.footer {
+    margin-top: 30px;
+    letter-spacing: 0.5px;
+    font-size: 14px;
+}
+
+.link {
+    color: #0ef;
+    text-decoration: none;
+}
+
+.banner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 450px;
+    height: 390px;
+    background: linear-gradient(to right, #0ef, #c800ff);
+    clip-path: polygon(10% 0, 100% 0, 100% 100%, 60% 100%);
+    padding-right: 70px;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    transition: all 0.5s ease;
+    animation: imageTransition 1s ease-in-out; 
+    border-radius: 30px;
+}
+
+.wel_text {
+    font-size: 60px;
+    margin-top: -50px;
+    line-height: 50px;
+}
+
+.admin-image {
+    width: 140px;
+    height: auto;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    animation: imageFadeIn 1s ease-out;
+}
+
+.bottom-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.toggle-btn {
+    background: linear-gradient(45deg, #ff4d4d, #ff6600); 
+    color: #fff;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 50px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: transform 0.3s ease, background 0.3s ease;
+    width: 25%;
+    position: absolute;
+    bottom: 10px;
+}
+
+.toggle-btn:hover {
+    transform: scale(1.1);
+    background: linear-gradient(45deg, #c800ff, #0ef);
+}
+
+#toggleToStudent {
+    display: block;
+    right: 10px;
+}
+
+#toggleToAdmin {
+    display: none;
+    left: 10px; 
+}
+
+#password {
+    display: block;
+}
+
+#studentInputs {
+    display: none;
+}
+
+body.student-login #adminInputs {
+    display: none;
+}
+
+body.student-login #passwordField {
+    display: none;
+}
+
+body.student-login #studentInputs {
+    display: block;
+}
+
+body.success .success-message {
+    display: block;
+}
+
+body.student-login #password {
+    display: none; 
+}
+
+body.student-login #toggleToAdmin {
+    display: block;
+}
+
+body.student-login #toggleToStudent {
+    display: none;
+}
+
+/* Animations */
+@keyframes imageTransition {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes imageFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Snow effect */
+.snow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.snowflake {
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    opacity: 0.7;
+    animation: snow-fall 10s linear infinite;
+}
+
+@keyframes snow-fall {
+    0% {
+        transform: translateY(-100px);
+        opacity: 0.7;
+    }
+    100% {
+        transform: translateY(100vh);
+        opacity: 0.3;
+    }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giám sát máy tính qua mạng</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="phantich.css">
+  <link rel="icon" href="LOGO.jpg" type="image/x-icon">
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="LOGO.jpg" alt="Logo" class="logo">
+    </div>
+
+    <nav class="menu">
+      <a href="index.html" class="active">GIÁM SÁT</a>
+      <a href="phan_tich.html">PHÂN TÍCH</a>
+    </nav>
+
+
+    <div class="user">
+      <div class="avatar"></div>
+      <div>
+        <div class="role">Admin</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="header">
+      <div class="title">GIAM SAT MAY TINH QUA MANG</div>
+    </header>
+
+    <section class="analysis-section">
+      <div class="controls">
+        <select id="machineSelect" class="select-box" onchange="loadImages()">
+          <option value="">Chọn máy</option>
+          <!-- Tùy thuộc vào dữ liệliệu, cập nhật option này -->
+        </select>
+        <input type="text" id="searchBox" class="search-box" placeholder="Tìm kiếm máy...">
+        <button class="search-btn" onclick="searchMachine()">Tìm kiếm</button>
+      </div>
+
+      <table class="image-table">
+        <thead>
+          <tr>
+            <th>Hình ảnh</th>
+            <th>Tên máy</th>
+            <th>Thời gian</th>
+          </tr>
+        </thead>
+        <tbody id="imageGallery">
+          <!-- Dữ liệu hình ảnh sẽ được hiển thị tại đây -->
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+  <script src="phantich.js"></script>
+</body>
+</html>

@@ -5,25 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Giám sát máy tính qua mạng</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="/Project-Lap-Trinh-Mang/imgs/LOGO.jpg" type="image/x-icon">
+  <link rel="icon" href="LOGO.jpg" type="image/x-icon">
 </head>
 <body>
-  
+
   <aside class="sidebar">
     <div class="brand">
-      <img src="/Project-Lap-Trinh-Mang/imgs/LOGO.jpg" alt="Logo" class="logo">
+      <img src="LOGO.jpg" alt="Logo" class="logo">
     </div>
 
     <nav class="menu">
-      <a href="#" class="active">GIÁM SÁT</a>
-      <a href="#">1</a>
-      <a href="#">2</a>
+      <a href="index.html" class="active">GIÁM SÁT</a>
+      <a href="phan_tich.html">PHÂN TÍCH</a>
     </nav>
 
     <div class="actions">
-      <div class="chip">BLOCK</div>
-      <div class="chip">ADD</div>
+      <div class="chip" id="blockBtn">BLOCK</div>
+      <div class="chip" id="addBtn">ADD</div>
     </div>
+
 
     <div class="user">
       <div class="avatar"></div>
@@ -36,14 +36,85 @@
   <main class="main">
     <header class="header">
       <div class="title">GIAM SAT MAY TINH QUA MANG</div>
+
+      <!-- Thêm ô random số gần nút Log in -->
+      <div id="randomNumberContainer" class="random-number-container">
+        <span id="randomNumber">----</span>
+      </div>
+
       <a href="log in.html">
         <button class="login-btn">Log in</button>
       </a>
     </header>
 
+
+
+    <section>
+      <p class="hint">Chọn máy cần giám sát — click để phóng to / mở giám sát</p>
+
+      <div class="grid" id="grid">
+        <div class="card" data-id="1" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 1 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 1</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+
+        <div class="card" data-id="2" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 2 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 2</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+
+        <div class="card" data-id="3" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 3 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 3</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+
+        <div class="card" data-id="4" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 4 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 4</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+
+        <div class="card" data-id="5" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 5 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 5</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+
+        <div class="card" data-id="6" data-link="#">
+          <div class="thumb"><div class="placeholder">MAY 6 PREVIEW</div></div>
+          <div class="card-label">
+            <div>May 6</div><button class="open-btn">Phóng to</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
-
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-title" id="modalTitle">Phóng to - May X</div>
+        <div class="modal-actions">
+          <button class="btn" id="prevBtn">‹</button>
+          <button class="btn" id="nextBtn">›</button>
+          <button class="btn primary" id="openMonitorBtn">Mở giám sát</button>
+          <button class="btn" id="closeModal">Đóng ✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="preview-embed" id="preview">Preview lớn (sẽ hiển thị luồng giám sát tại đây)</div>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

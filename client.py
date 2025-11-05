@@ -11,6 +11,8 @@ import os
 import json
 import hashlib
 import sys
+import tkinter as tk
+from tkinter import messagebox
 
 # Định nghĩa kích thước header cho giao thức
 HEADER_LENGTH = 15
@@ -24,6 +26,7 @@ class RemoteMonitorClient:
         self.session_id = ""
         self.password = self.config.get("PASSWORD", "change_this_password")
         self.server_tcp_port = self.config.get("SERVER_PORT", 5000)
+        self.block_window = None
         
     def load_config(self):
         config_path = "client_config.json"
@@ -57,6 +60,56 @@ class RemoteMonitorClient:
         
         sock.sendall(header)
         sock.sendall(payload)
+
+    def recv_all(self, sock, n):
+        data = bytearray()
+        while len(data) < n:
+            packet = sock.recv(n - len(data))
+            if not packet:
+                return None
+            data.extend(packet)
+        return data
+
+    def listen_server(self):
+        """Lắng nghe các thông điệp từ server (CMD...)"""
+        try:
+            while self.is_connected and self.tcp_socket:
+                header = self.recv_all(self.tcp_socket, HEADER_LENGTH)
+                if not header:
+                    break
+                msg_type = header[0:5].decode('utf-8').strip()
+                data_length = int(header[5:15].decode('utf-8'))
+                if data_length <= 0:
+                    continue
+                payload = self.recv_all(self.tcp_socket, data_length)
+                if not payload:
+                    break
+
+                if msg_type == 'CMD':
+                    try:
+                        data = json.loads(payload.decode('utf-8'))
+                        action = data.get('action', '').upper()
+                        print(f"Nhận lệnh từ server: {action}")
+                        if action == 'BLOCK':
+                            # Hiển thị màn hình đen chặn người dùng
+                            self.show_block_screen()
+                        elif action == 'UNBLOCK':
+                            # Tắt màn hình chặn
+                            self.hide_block_screen()
+                        elif action == 'SHUTDOWN':
+                            # Thực hiện lệnh tắt máy
+                            print("Đang thực hiện lệnh tắt máy từ admin...")
+                            self.shutdown_computer()
+                        else:
+                            print(f"Lệnh không hỗ trợ: {action}")
+                    except Exception as e:
+                        print(f"Lỗi xử lý lệnh: {e}")
+                else:
+                    print(f"Nhận được lệnh không xác định: {msg_type}")
+        except Exception as e:
+            print(f"Mất kết nối với server: {e}")
+        finally:
+            self.is_connected = False
 
     def discover_server(self, session_id):
         """ Phần UDP Discovery (giữ nguyên) """
@@ -113,6 +166,8 @@ class RemoteMonitorClient:
             payload = json.dumps(metadata).encode('utf-8')
             
             self.send_message(self.tcp_socket, "REG", payload)
+            # start listening thread for incoming commands from server
+            threading.Thread(target=self.listen_server, daemon=True).start()
             
             self.is_connected = True
             return True
@@ -182,6 +237,92 @@ class RemoteMonitorClient:
         for i in range(len(out)):
             out[i] ^= key[i % len(key)]
         return b"XORv1" + bytes(out) # Thêm prefix để server nhận diện
+
+    # ---------------- Block screen UI ----------------
+    def show_block_screen(self):
+        """Hiển thị màn hình đen chặn toàn màn hình"""
+        if self.block_window:
+            return
+
+        def run_window():
+            try:
+                root = tk.Tk()
+                root.title("BLOCKED")
+                root.attributes('-topmost', True)  # Luôn hiển thị trên cùng
+                root.overrideredirect(True)  # Ẩn thanh tiêu đề
+                root.attributes('-fullscreen', True)  # Chế độ toàn màn hình
+                
+                # Tắt các phím thoát
+                root.bind('<Alt-F4>', lambda e: None)
+                root.bind('<Escape>', lambda e: None)
+                
+                # Khung chứa nội dung
+                frame = tk.Frame(root, bg='black')
+                frame.pack(expand=True, fill='both')
+                
+                # Thông báo chính
+                main_label = tk.Label(
+                    frame, 
+                    text='⛔ MÁY TÍNH ĐÃ BỊ KHÓA ⛔', 
+                    fg='red', 
+                    bg='black',
+                    font=('Segoe UI', 48, 'bold')
+                )
+                main_label.pack(expand=True)
+                
+                # Thông báo phụ
+                sub_label = tk.Label(
+                    frame,
+                    text='Vui lòng liên hệ Admin để được mở khóa',
+                    fg='white',
+                    bg='black',
+                    font=('Segoe UI', 24)
+                )
+                sub_label.pack(pady=20)
+                
+                self.block_window = root
+                root.mainloop()
+            except Exception as e:
+                print(f"Lỗi hiển thị màn hình khóa: {e}")
+            finally:
+                self.block_window = None
+
+        t = threading.Thread(target=run_window, daemon=True)
+        t.start()
+
+    def hide_block_screen(self):
+        """Đóng cửa sổ fullscreen nếu đang mở."""
+        try:
+            if self.block_window:
+                try:
+                    self.block_window.destroy()
+                except Exception:
+                    pass
+                self.block_window = None
+        except Exception as e:
+            print(f"Lỗi hide_block_screen: {e}")
+            
+    def shutdown_computer(self):
+        """Thực hiện lệnh tắt máy từ xa"""
+        try:
+            if os.name == 'nt':  # Windows
+                os.system('shutdown /s /t 30 /c "Máy tính sẽ tắt sau 30 giây theo yêu cầu từ quản trị viên"')
+            else:  # Linux/Unix
+                os.system('shutdown -h +1 "Máy tính sẽ tắt sau 1 phút theo yêu cầu từ quản trị viên"')
+            
+            # Hiển thị thông báo cho người dùng
+            root = tk.Tk()
+            root.withdraw()  # Ẩn cửa sổ chính
+            messagebox.showwarning(
+                "CẢNH BÁO TẮT MÁY",
+                "Máy tính sẽ tự động tắt sau 30 giây theo yêu cầu từ quản trị viên.\n\n" +
+                "Vui lòng lưu lại công việc của bạn!"
+            )
+            root.destroy()
+            
+            print("Đã bắt đầu quá trình tắt máy.")
+        except Exception as e:
+            print(f"Lỗi khi thực hiện lệnh tắt máy: {e}")
     
     def disconnect(self):
         self.stop_event.set()

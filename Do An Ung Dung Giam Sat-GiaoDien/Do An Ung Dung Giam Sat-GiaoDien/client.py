@@ -12,7 +12,7 @@ import sys
 import tkinter as tk
 from tkinter import messagebox
 from queue import Queue
-import keyboard   # ✅ dùng để chặn phím
+import keyboard
 
 HEADER_LENGTH = 15
 
@@ -30,6 +30,7 @@ class RemoteMonitorClient:
         self.block_window = None
         self.allow_remote_control = False
 
+        self.mouse_locking = False  # ✅ khóa chuột
         self.command_queue = Queue()
 
     def load_config(self):
@@ -72,7 +73,7 @@ class RemoteMonitorClient:
 
             if not self.allow_remote_control:
                 if not self.ask_permission_gui():
-                    print("❌ User từ chối quyền của giáo viên")
+                    print("❌ User từ chối giáo viên điều khiển")
                     return
                 self.allow_remote_control = True
 
@@ -190,7 +191,26 @@ class RemoteMonitorClient:
             out[i] ^= key[i % len(key)]
         return b"XORv1" + bytes(out)
 
-    # ✅ CHẶN PHÍM + KHÓA MÀN HÌNH
+    # ✅ KHÓA CHUỘT
+    def lock_mouse_loop(self):
+        screen_w, screen_h = pyautogui.size()
+        center_x, center_y = screen_w // 2, screen_h // 2
+
+        while self.mouse_locking:
+            try:
+                pyautogui.moveTo(center_x, center_y)
+                time.sleep(0.05)
+            except:
+                pass
+
+    # ✅ ẨN TASKBAR
+    def hide_taskbar(self):
+        os.system('powershell -command "$t=(New-Object -Com Shell.Application).Tray; $t.Hide()"')
+
+    def show_taskbar(self):
+        os.system('powershell -command "$t=(New-Object -Com Shell.Application).Tray; $t.Show()"')
+
+    # ✅ BLOCK FULL
     def show_block_screen(self):
         if self.block_window:
             return
@@ -202,7 +222,6 @@ class RemoteMonitorClient:
         self.block_window.lift()
         self.block_window.attributes("-topmost", True)
 
-        # ✅ Chặn các phím nóng
         keys_to_block = [
             "alt+tab", "alt+f4", "win", "win+tab",
             "ctrl+esc", "ctrl+shift+esc", "alt+esc"
@@ -213,6 +232,12 @@ class RemoteMonitorClient:
             except:
                 pass
 
+        self.hide_taskbar()
+
+        # ✅ Khóa chuột
+        self.mouse_locking = True
+        threading.Thread(target=self.lock_mouse_loop, daemon=True).start()
+
         tk.Label(
             self.block_window,
             text="⛔ MÁY TÍNH ĐÃ BỊ KHÓA ⛔",
@@ -221,6 +246,7 @@ class RemoteMonitorClient:
             font=("Arial", 48, "bold")
         ).pack(expand=True)
 
+    # ✅ MỞ KHÓA
     def hide_block_screen(self):
         if self.block_window:
             self.block_window.destroy()
@@ -230,6 +256,9 @@ class RemoteMonitorClient:
             keyboard.unhook_all()
         except:
             pass
+
+        self.mouse_locking = False
+        self.show_taskbar()
 
     def shutdown_computer(self):
         os.system("shutdown /s /t 10")
